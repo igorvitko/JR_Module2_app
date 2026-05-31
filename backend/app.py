@@ -1,37 +1,137 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import json
+import cgi
+import uuid
+import os
+from http.server import HTTPServer
+from logger import logger
+
+from database import ImageRepository
+from handlers import BaseHandler
+from config import settings
+from utils import (
+    get_query_params,
+    validate_extension,
+    validate_size,
+    save_image,
+    is_image_exists,
+    delete_image
+)
 
 
-class ImageAPIServer(BaseHTTPRequestHandler):
+class ImageAPIServer(BaseHandler):
+    def __init__(self, *args, **kwargs):
+        self.repo = ImageRepository()
+        super().__init__(*args, **kwargs)
 
     def handle_images(self):
-        self.send_response(200)
+        params = get_query_params(self.path)
 
-        self.send_header("Content-type", "application/json")
-        self.end_headers()
-
-        response_data = {"status": "success", "message": "Hello from Python!"}
-        json_string = json.dumps(response_data)
-
-        self.wfile.write(json_string.encode('utf-8'))
+        images = self.repo.list(
+            page=int(params.get('page')) if params.get(
+                'page').isdigit() else 1,
+            limit=int(params.get('limit')) if params.get(
+                'limit').isdigit() else 10,
+            order=params.get('order', 'desc')
+        )
+        self._send_json(200, images)
 
     def handle_image(self):
-        ...
+        filename = self.path.split("/")[-1]
+        logger.info(f"Get filename: {filename}")
+
+        image = self.repo.get_by_filename(filename)
+
+        self._send_json(200, image)
 
     def handle_upload(self):
-        ...
+        content_type = self.headers.get("Content-Type", "")
+        if "multipart/form-data" not in content_type:
+            self._send_error(400, "Expected multipart/form-data")
+            return
+
+        form = cgi.FieldStorage(
+            fp=self.rfile,
+            headers=self.headers,
+            environ={"REQUEST_METHOD": "POST"},
+        )
+
+        if "file" not in form:
+            self._send_error(400, "No file provided")
+            return
+
+        file_item = form["file"]
+        if not file_item.filename:
+            self._send_error(400, "No file provided")
+            return
+
+        original_name: str = file_item.filename
+        data: bytes = file_item.file.read()
+
+        if not validate_extension(original_name):
+            self._send_error(
+                400, f"Invalid file type. Allowed: {settings.allowed_files_types}")
+            return
+
+        if not validate_size(len(data)):
+            self._send_error(
+                413, f"File too large. MAx: {settings.max_file_size_mb} MB")
+            return
+
+        ext = original_name.split(".")[-1].lower()
+        filename = f"{uuid.uuid4()}.{ext}"
+
+        try:
+            save_image(filename, data)
+
+            image_id = self.repo.create(
+                file_name=filename,
+                original_name=original_name,
+                size=len(data),
+                file_type=ext
+            )
+        except Exception as e:
+            logger.error("Error creating or saving image", e)
+            delete_image(filename)
+
+        self._send_json(201, {
+            "id": image_id,
+            "file_name": filename,
+            "url": f"{settings.images_dir}/{filename}"
+        }
+        )
+
+    def delete_image(self):
+        filename = self.path.split("/")[-1]
+        logger.info(f"File name: {filename}")
+        # delete from db
+        deleted = self.repo.delete_by_filename(filename)
+        if not deleted:
+            self._send_error(404, "Image not found")
+            return
+
+        # delete from filesystem
+        if not delete_image(filename):
+            self._send_error(404, "Image not found")
+            return
+
+        self._send_json(204, {})
 
     def do_GET(self):
-        self.path = self.path.rstrip('/')
+        logger.info(f"Received GET request for path: {self.path}")
 
-        if self.path == '/images':
+        if '/images' in self.path and '&' in self.path:
             self.handle_images()
-        elif self.path == '/images/':  # FIXME
+        else:
             self.handle_image()
 
-        def do_POST(self):
-            if self.path == '/upload':
-                self.handle_upload()
+    def do_POST(self):
+        if '/upload' in self.path:
+            self.handle_upload()
+
+    def do_DELETE(self):
+        logger.info(f"Received DELETE request for {self.path}")
+
+        if self.path.startswith('/images/'):
+            self.delete_image()
 
 
 def run(server_class=HTTPServer, handler_class=ImageAPIServer, port=8000):

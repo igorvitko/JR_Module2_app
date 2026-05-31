@@ -2,8 +2,9 @@ services:
   backend:
     build:
       context: ./backend
-    expose:
-      - "8000"
+    container_name: backend
+    ports:
+      - "8000:8000"
     env_file:
       - .env
     depends_on:
@@ -29,7 +30,7 @@ services:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_HOST: ${DB_HOST}
+      POSTGRES_HOST: postgres
       POSTGRES_PORT: ${DB_PORT}
     expose:
       - "5432"

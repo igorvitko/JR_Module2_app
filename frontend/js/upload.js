@@ -8,18 +8,19 @@
     /* --------------------------------------------------------------------
      *  CONSTANTS
      * ------------------------------------------------------------------ */
-    const API_UPLOAD_URL = `${location.origin}/api/upload/`;
-    const API_DELETE_URL = (fn) => `${location.origin}/api/upload/${encodeURIComponent(fn)}`;
+    const API_UPLOAD_URL = `http://localhost:8000/upload/`;
+    const API_IMAGES_URL = `http://localhost:8000/images`;
+    const API_DELETE_URL = (fn) => `http://localhost:8000/images/${encodeURIComponent(fn)}`;
 
     const LS_KEYS = {
-        PER_PAGE: 'image_host_per_page',
+        LIMIT: 'image_host_limit',
         ACTIVE_TAB: 'image_host_active_tab',
         SORT_ORDER: 'image_host_sort_order'
     };
 
     const DEFAULT_PAGE = 1;
-    const DEFAULT_PER_PAGE = 8;
-    const AVAILABLE_PER_PAGE = [4, 8, 12];
+    const DEFAULT_LIMIT = 10;
+    const AVAILABLE_LIMITS = [4, 8, 12];
     const DEFAULT_TAB = 'upload';
     const DEFAULT_SORT_ORDER = 'desc';
     const VALID_TABS = ['upload', 'images'];
@@ -43,7 +44,7 @@
         nextPageBtn: '#nextPage',
         currentPageSpan: '#currentPage',
         totalPagesSpan: '#totalPages',
-        perPageSelect: '#perPageSelect',
+        limitSelect: '#limitSelect',
         sortSelect: '#sortSelect'
     };
 
@@ -54,17 +55,17 @@
 
     console.log('[INIT] Script started, location:', location.href);
 
-    const getSavedPerPage = () => {
-        const saved = localStorage.getItem(LS_KEYS.PER_PAGE);
-        if (saved && AVAILABLE_PER_PAGE.includes(parseInt(saved))) {
+    const getSavedLimit = () => {
+        const saved = localStorage.getItem(LS_KEYS.LIMIT);
+        if (saved && AVAILABLE_LIMITS.includes(parseInt(saved))) {
             return parseInt(saved);
         }
-        return DEFAULT_PER_PAGE;
+        return DEFAULT_LIMIT;
     };
 
-    const savePerPage = (perPage) => {
-        console.log('[savePerPage] Saving perPage to localStorage:', perPage);
-        localStorage.setItem(LS_KEYS.PER_PAGE, perPage.toString());
+    const saveLimit = (limit) => {
+        console.log('[saveLimit] Saving limit to localStorage:', limit);
+        localStorage.setItem(LS_KEYS.LIMIT, limit.toString());
     };
 
     const getSavedActiveTab = () => {
@@ -129,14 +130,14 @@
     /**
      * Update pagination-related URL parameters
      * @param {number} page - Current page
-     * @param {number} perPage - Items per page
+     * @param {number} limit - Items per page
      * @param {string} order - Sort order
      */
-    const updatePaginationUrlParams = (page, perPage, order) => {
-        console.log(`[updatePaginationUrlParams] page=${page}, perPage=${perPage}, order=${order}`);
+    const updatePaginationUrlParams = (page, limit, order) => {
+        console.log(`[updatePaginationUrlParams] page=${page}, limit=${limit}, order=${order}`);
         const url = new URL(window.location);
         url.searchParams.set('page', page.toString());
-        url.searchParams.set('per_page', perPage.toString());
+        url.searchParams.set('limit', limit.toString());
         url.searchParams.set('order', order);
         window.history.replaceState({}, '', url);
     };
@@ -148,7 +149,7 @@
         console.log('[removePaginationUrlParams] Removing pagination params');
         const url = new URL(window.location);
         url.searchParams.delete('page');
-        url.searchParams.delete('per_page');
+        url.searchParams.delete('limit');
         url.searchParams.delete('order');
         window.history.replaceState({}, '', url);
     };
@@ -160,7 +161,7 @@
         console.log('[initPaginationFromUrl] Starting, current state:', paginationState);
 
         const urlPage = getUrlParam('page');
-        const urlPerPage = getUrlParam('per_page');
+        const urlLimit = getUrlParam('limit');
         const urlOrder = getUrlParam('order');
 
         if (urlPage) {
@@ -171,11 +172,11 @@
             }
         }
 
-        if (urlPerPage) {
-            const perPageNum = parseInt(urlPerPage);
-            if (AVAILABLE_PER_PAGE.includes(perPageNum)) {
-                paginationState.perPage = perPageNum;
-                console.log('[initPaginationFromUrl] Set perPage from URL:', perPageNum);
+        if (urlLimit) {
+            const limitNum = parseInt(urlLimit);
+            if (AVAILABLE_LIMITS.includes(limitNum)) {
+                paginationState.limit = limitNum;
+                console.log('[initPaginationFromUrl] Set limit from URL:', limitNum);
             }
         }
 
@@ -210,7 +211,7 @@
 
     const paginationState = {
         currentPage: DEFAULT_PAGE,
-        perPage: getSavedPerPage(),
+        limit: getSavedLimit(),
         totalPages: 1,
         totalItems: 0,
         sortOrder: getSavedSortOrder()
@@ -252,7 +253,7 @@
                 message: e.response?.data?.detail || e.message || 'Unknown error',
             };
 
-            if (method.toLowerCase() === 'get' && url.startsWith(API_UPLOAD_URL) && error.status === 404) {
+            if (method.toLowerCase() === 'get' && url.startsWith(API_IMAGES_URL) && error.status === 404) {
                 console.log('[API] GET 404 - returning empty data');
                 return {data: {items: [], pagination: {total: 0, pages: 0}}};
             }
@@ -327,7 +328,7 @@
                 if (tabId === 'images') {
                     updatePaginationUrlParams(
                         paginationState.currentPage,
-                        paginationState.perPage,
+                        paginationState.limit,
                         paginationState.sortOrder
                     );
                 } else {
@@ -410,7 +411,7 @@
         }
 
         const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-        const maxSize = 1 * 1024 * 1024;
+        const maxSize = 5 * 1024 * 1024;
 
         /**
          * Upload a single file to the server.
@@ -510,7 +511,7 @@
         const nextPageBtn = $(SEL.nextPageBtn);
         const currentPageSpan = $(SEL.currentPageSpan);
         const totalPagesSpan = $(SEL.totalPagesSpan);
-        const perPageSelect = $(SEL.perPageSelect);
+        const limitSelect = $(SEL.limitSelect);
         const sortSelect = $(SEL.sortSelect);
 
         console.log('[initImagesTab] Found elements:', {
@@ -521,7 +522,7 @@
             nextPageBtn: !!nextPageBtn,
             currentPageSpan: !!currentPageSpan,
             totalPagesSpan: !!totalPagesSpan,
-            perPageSelect: !!perPageSelect,
+            limitSelect: !!limitSelect,
             sortSelect: !!sortSelect
         });
 
@@ -535,7 +536,7 @@
          */
         const updateSelectsFromState = () => {
             console.log('[updateSelectsFromState] Updating selects with state:', paginationState);
-            if (perPageSelect) perPageSelect.value = paginationState.perPage.toString();
+            if (limitSelect) limitSelect.value = paginationState.limit.toString();
             if (sortSelect) sortSelect.value = paginationState.sortOrder;
         };
 
@@ -553,7 +554,7 @@
 
             updatePaginationUrlParams(
                 paginationState.currentPage,
-                paginationState.perPage,
+                paginationState.limit,
                 paginationState.sortOrder
             );
         };
@@ -579,7 +580,7 @@
                 paginationState.totalItems--;
                 paginationState.totalPages = Math.max(
                     1,
-                    Math.ceil(paginationState.totalItems / paginationState.perPage)
+                    Math.ceil(paginationState.totalItems / paginationState.limit)
                 );
 
                 console.log('[deleteImage] Updated pagination after delete:', paginationState);
@@ -662,7 +663,7 @@
             updateSelectsFromState();
 
             try {
-                const url = `${API_UPLOAD_URL}?page=${paginationState.currentPage}&per_page=${paginationState.perPage}&order=${paginationState.sortOrder}`;
+                const url = `${API_IMAGES_URL}?page=${paginationState.currentPage}&limit=${paginationState.limit}&order=${paginationState.sortOrder}`;
                 console.log('[loadImages] Making API request to:', url);
 
                 const response = await api('get', url);
@@ -682,7 +683,7 @@
                 imgGallery.innerHTML = '';
 
                 paginationState.totalItems = pagination.total || files.length;
-                paginationState.totalPages = pagination.pages || Math.ceil(files.length / paginationState.perPage) || 1;
+                paginationState.totalPages = pagination.pages || Math.ceil(files.length / paginationState.limit) || 1;
 
                 console.log('[loadImages] Updated pagination state:', paginationState);
 
@@ -721,19 +722,19 @@
             }
         };
 
-        if (perPageSelect) {
-            perPageSelect.addEventListener('change', () => {
-                const newPerPage = parseInt(perPageSelect.value);
-                console.log('[perPageSelect] Change event:', newPerPage);
-                if (AVAILABLE_PER_PAGE.includes(newPerPage) && newPerPage !== paginationState.perPage) {
-                    paginationState.perPage = newPerPage;
+        if (limitSelect) {
+            limitSelect.addEventListener('change', () => {
+                const newLimit = parseInt(limitSelect.value);
+                console.log('[limitSelect] Change event:', newLimit);
+                if (AVAILABLE_LIMITS.includes(newLimit) && newLimit !== paginationState.limit) {
+                    paginationState.limit = newLimit;
                     paginationState.currentPage = 1;
-                    savePerPage(newPerPage);
+                    saveLimit(newLimit);
                     loadImages();
                 }
             });
         } else {
-            console.log('[initImagesTab] perPageSelect not found, skipping event listener');
+            console.log('[initImagesTab] limitSelect not found, skipping event listener');
         }
 
         if (sortSelect) {

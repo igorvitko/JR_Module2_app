@@ -9,8 +9,8 @@
     /* --------------------------------------------------------------------
      *  CONSTANTS
      * ------------------------------------------------------------------ */
-    const API_DELETE_URL = (fn) => `${location.origin}/api/upload/${encodeURIComponent(fn)}`;
-    const API_DETAIL_URL = (fn) => `${location.origin}/api/upload/${encodeURIComponent(fn)}`;
+    const API_DELETE_URL = (fn) => `http://localhost:8000/images/${encodeURIComponent(fn)}`;
+    const API_DETAIL_URL = (fn) => `http://localhost:8000/images/${encodeURIComponent(fn)}`;
 
     const SEL = {
         loadingContainer: '#loadingContainer',
