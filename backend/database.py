@@ -38,6 +38,12 @@ class ImageRepository:
             image_id = cur.fetchone()[0]
             return image_id
 
+    def count(self) -> int:
+        with self._cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM images")
+            result = cur.fetchone()
+            return result[0] if result else 0
+
     def list(self, page: int = 1, limit: int = 10, order: str = "desc") -> list[dict]:
         with self._cursor(dict_rows=True) as cur:
             offset = (page - 1) * limit

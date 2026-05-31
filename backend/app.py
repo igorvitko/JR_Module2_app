@@ -1,6 +1,7 @@
 import cgi
 import uuid
 import os
+import math
 from http.server import HTTPServer
 from logger import logger
 
@@ -25,14 +26,30 @@ class ImageAPIServer(BaseHandler):
     def handle_images(self):
         params = get_query_params(self.path)
 
+        page = int(params.get('page')) if params.get(
+            'page').isdigit() else 1
+        limit = int(params.get('limit')) if params.get(
+            'limit').isdigit() else 10
+        order = params.get('order', 'desc')
+
         images = self.repo.list(
-            page=int(params.get('page')) if params.get(
-                'page').isdigit() else 1,
-            limit=int(params.get('limit')) if params.get(
-                'limit').isdigit() else 10,
-            order=params.get('order', 'desc')
+            page=page, limit=limit, order=order
         )
-        self._send_json(200, images)
+
+        total_items = self.repo.count()
+        total_pages = math.ceil(total_items/limit) if total_items > 0 else 1
+
+        response_data = {
+            "items": images,
+            "pagination": {
+                "total": total_items,
+                "pages": total_pages,
+                "page": page,
+                "limit": limit
+            }
+        }
+
+        self._send_json(200, response_data)
 
     def handle_image(self):
         filename = self.path.split("/")[-1]
