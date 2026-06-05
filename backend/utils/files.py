@@ -13,7 +13,7 @@ def is_image_exists(filename: str) -> bool:
     return os.path.exists(os.path.join(settings.images_dir, filename))
 
 
-def delete_image(filename: str) -> bool:
+def del_image(filename: str) -> bool:
     try:
         os.remove(os.path.join(settings.images_dir, filename))
         return True

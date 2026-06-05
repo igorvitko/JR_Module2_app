@@ -9,8 +9,9 @@
     /* --------------------------------------------------------------------
      *  CONSTANTS
      * ------------------------------------------------------------------ */
-    const API_DELETE_URL = (fn) => `http://localhost:8000/images/${encodeURIComponent(fn)}`;
-    const API_DETAIL_URL = (fn) => `http://localhost:8000/images/${encodeURIComponent(fn)}`;
+    const API = window.APP_CONFIG.baseUrl;
+    const API_DELETE_URL = (fn) => `${API}/api/images/${encodeURIComponent(fn)}`;
+    const API_DETAIL_URL = (fn) => `${API}/api/images/${encodeURIComponent(fn)}`;
 
     const SEL = {
         loadingContainer: '#loadingContainer',

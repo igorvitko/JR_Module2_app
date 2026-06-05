@@ -14,7 +14,7 @@ from utils import (
     validate_size,
     save_image,
     is_image_exists,
-    delete_image
+    del_image
 )
 
 
@@ -23,7 +23,7 @@ class ImageAPIServer(BaseHandler):
         self.repo = ImageRepository()
         super().__init__(*args, **kwargs)
 
-    def handle_images(self):
+    def get_images(self):
         params = get_query_params(self.path)
 
         page = int(params.get('page')) if params.get(
@@ -44,22 +44,25 @@ class ImageAPIServer(BaseHandler):
             "pagination": {
                 "total": total_items,
                 "pages": total_pages,
-                "page": page,
-                "limit": limit
+                # "page": page,
+                # "limit": limit
             }
         }
 
         self._send_json(200, response_data)
 
-    def handle_image(self):
+    def get_image(self):
         filename = self.path.split("/")[-1]
         logger.info(f"Get filename: {filename}")
 
         image = self.repo.get_by_filename(filename)
 
+        if image is None:
+            self._send_error(404, "Not found")
+
         self._send_json(200, image)
 
-    def handle_upload(self):
+    def create_image(self):
         content_type = self.headers.get("Content-Type", "")
         if "multipart/form-data" not in content_type:
             self._send_error(400, "Expected multipart/form-data")
@@ -126,7 +129,7 @@ class ImageAPIServer(BaseHandler):
             return
 
         # delete from filesystem
-        if not delete_image(filename):
+        if not del_image(filename):
             self._send_error(404, "Image not found")
             return
 
@@ -136,18 +139,18 @@ class ImageAPIServer(BaseHandler):
         logger.info(f"Received GET request for path: {self.path}")
 
         if '/images' in self.path and '&' in self.path:
-            self.handle_images()
+            self.get_images()
         else:
-            self.handle_image()
+            self.get_image()
 
     def do_POST(self):
         if '/upload' in self.path:
-            self.handle_upload()
+            self.create_image()
 
     def do_DELETE(self):
         logger.info(f"Received DELETE request for {self.path}")
 
-        if self.path.startswith('/images/'):
+        if '/images/' in self.path:
             self.delete_image()
 
 
