@@ -11,6 +11,7 @@ services:
       - postgres
     volumes:
       - ./images:/app/images
+      - ./logs:/app/logs
     restart: always
 
   nginx:
@@ -41,6 +42,17 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/1-init.sql:/docker-entrypoint-initdb.d/1-init.sql:ro
+
+  backup:
+    image: postgres:17.9-alpine
+    container_name: backup
+    environment:
+      PGPASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      - postgres
+    entrypoint: ["sh", "/backups/auto_backup.sh"]
 
 volumes:
   postgres_data:

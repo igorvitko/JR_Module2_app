@@ -411,7 +411,7 @@
             return;
         }
 
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+        const allowedTypes = ['image/jpg', 'image/jpeg', 'image/png', 'image/gif'];
         const maxSize = 5 * 1024 * 1024;
 
         /**

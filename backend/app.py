@@ -44,22 +44,25 @@ class ImageAPIServer(BaseHandler):
             "pagination": {
                 "total": total_items,
                 "pages": total_pages,
-                # "page": page,
-                # "limit": limit
+                "page": page,
+                "limit": limit
             }
         }
+
+        logger.info("List of images are successfuly get")
 
         self._send_json(200, response_data)
 
     def get_image(self):
         filename = self.path.split("/")[-1]
-        logger.info(f"Get filename: {filename}")
 
         image = self.repo.get_by_filename(filename)
 
         if image is None:
+            logger.error(f"Image '{filename}' not found")
             self._send_error(404, "Not found")
 
+        logger.info(f"Geted image: '{filename}'")
         self._send_json(200, image)
 
     def create_image(self):
@@ -110,7 +113,7 @@ class ImageAPIServer(BaseHandler):
             )
         except Exception as e:
             logger.error("Error creating or saving image", e)
-            delete_image(filename)
+            del_image(filename)
 
         self._send_json(201, {
             "id": image_id,
@@ -121,7 +124,6 @@ class ImageAPIServer(BaseHandler):
 
     def delete_image(self):
         filename = self.path.split("/")[-1]
-        logger.info(f"File name: {filename}")
         # delete from db
         deleted = self.repo.delete_by_filename(filename)
         if not deleted:
@@ -133,15 +135,20 @@ class ImageAPIServer(BaseHandler):
             self._send_error(404, "Image not found")
             return
 
+        logger.info(f"Deleted image: {filename}")
+
         self._send_json(204, {})
 
     def do_GET(self):
         logger.info(f"Received GET request for path: {self.path}")
 
-        if '/images' in self.path and '&' in self.path:
-            self.get_images()
+        if '/images' in self.path:
+            if '&' in self.path:
+                self.get_images()
+            else:
+                self.get_image()
         else:
-            self.get_image()
+            self._send_error(404, "Page not found")
 
     def do_POST(self):
         if '/upload' in self.path:
