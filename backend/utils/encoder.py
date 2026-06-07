@@ -1,6 +1,7 @@
 import json
-from datetime import datetime
 import contextlib
+from datetime import datetime
+from urllib.parse import urlparse, parse_qs
 
 
 class AppJSONEncoder(json.JSONEncoder):
@@ -10,16 +11,14 @@ class AppJSONEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
-def get_query_params(path) -> dict[str, str]:
-    if "?" not in path:
-        return {}
+def parser_url(url) -> tuple[str, dict[str, str]]:
+    parsed_url = urlparse(url)
+    path = parsed_url.path
+    params = {k: v[0] for k, v in parse_qs(parsed_url.query).items()}
+    return path, params
 
-    query = path.split("?")[1]
-    params = {}
 
-    for pair in query.split("&"):
-        with contextlib.suppress(AttributeError):
-            key, value = pair.split("=", 1)
-            params[key] = value
-
-    return params
+# test
+# url = "http://localhost/api/images?tab=images&page=1&limit=10&order=desc"
+url = "http://localhost/api/images/imagesss.png"
+print(parser_url(url))

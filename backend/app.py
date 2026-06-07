@@ -9,12 +9,12 @@ from database import ImageRepository
 from handlers import BaseHandler
 from config import settings
 from utils import (
-    get_query_params,
     validate_extension,
     validate_size,
     save_image,
     is_image_exists,
-    del_image
+    del_image,
+    parser_url
 )
 
 
@@ -24,7 +24,12 @@ class ImageAPIServer(BaseHandler):
         super().__init__(*args, **kwargs)
 
     def get_images(self):
-        params = get_query_params(self.path)
+        _, params = parser_url(self.path)
+
+        if not params:
+            logger.error("Query not found")
+            self._send_error(400, "Bad request - without params")
+            return
 
         page = int(params.get('page')) if params.get(
             'page').isdigit() else 1
@@ -53,14 +58,19 @@ class ImageAPIServer(BaseHandler):
 
         self._send_json(200, response_data)
 
-    def get_image(self):
-        filename = self.path.split("/")[-1]
+    def get_image(self, filename):
 
         image = self.repo.get_by_filename(filename)
 
+        if ".." in filename or filename.startswith("/"):
+            logger.error(f"Bad Request")
+            self._send_error(400, "Bad Request")
+            return
+
         if image is None:
             logger.error(f"Image '{filename}' not found")
-            self._send_error(404, "Not found")
+            self._send_error(404, "Not found file")
+            return
 
         logger.info(f"Geted image: '{filename}'")
         self._send_json(200, image)
@@ -122,8 +132,7 @@ class ImageAPIServer(BaseHandler):
         }
         )
 
-    def delete_image(self):
-        filename = self.path.split("/")[-1]
+    def delete_image(self, filename):
         # delete from db
         deleted = self.repo.delete_by_filename(filename)
         if not deleted:
@@ -142,23 +151,32 @@ class ImageAPIServer(BaseHandler):
     def do_GET(self):
         logger.info(f"Received GET request for path: {self.path}")
 
-        if '/images' in self.path:
-            if '&' in self.path:
-                self.get_images()
-            else:
-                self.get_image()
+        path, params = parser_url(self.path)
+
+        if path == '/api/images':
+            self.get_images()
+        elif path.startswith('/api/images/'):
+            filename = path[len('/api/images/'):]
+            self.get_image(filename)
         else:
             self._send_error(404, "Page not found")
 
     def do_POST(self):
-        if '/upload' in self.path:
+        logger.info(f"Received UPLOAD request for {self.path}")
+
+        path, _ = parser_url(self.path)
+
+        if path.startswith('/api/upload'):
             self.create_image()
 
     def do_DELETE(self):
         logger.info(f"Received DELETE request for {self.path}")
 
-        if '/images/' in self.path:
-            self.delete_image()
+        path, _ = parser_url(self.path)
+
+        if path.startswith('/api/images'):
+            filename = path[len('/api/images/'):]
+            self.delete_image(filename)
 
 
 def run(server_class=HTTPServer, handler_class=ImageAPIServer, port=8000):
